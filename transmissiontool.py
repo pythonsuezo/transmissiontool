@@ -23,6 +23,7 @@ path = os.path.dirname( sys.argv[0] )
 INI = path + "/INI.conf"
 conf = configparser.SafeConfigParser()
 conf.read(INI)
+version = "Ver.0.90"
 if not os.path.exists( path+"/log" ):
     os.mkdir(path+"/log")
 if not os.path.exists( INI ):
@@ -69,6 +70,7 @@ class Mainframe( teraframe.MyFrame1 ):
     def __init__( self, parent ):
         teraframe.MyFrame1.__init__( self, parent )
         logging.info( "ソフト起動" )
+        self.SetTitle("通信ソフト "+version)
         IP_log = os.path.join( path, "IP_log.txt")
         subframe = MyDialog1( None )
         result = subframe.ShowModal()

@@ -9,6 +9,10 @@ HOST: localhost , port: 50007
 で繋がります。
 サーバーへ送信した文字列をそのまま返してくれます。
 
+動作確認
+windows7
+python 32bit ver.3.5.4
+
 起動に必要な外部ライブラリ
 ・wxpython
 ・pyserial

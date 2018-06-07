@@ -23,7 +23,7 @@ path = os.path.dirname( sys.argv[0] )
 INI = path + "/INI.conf"
 conf = configparser.SafeConfigParser()
 conf.read(INI)
-version = "Ver.0.90"
+version = "Ver. 0.90"
 if not os.path.exists( path+"/log" ):
     os.mkdir(path+"/log")
 if not os.path.exists( INI ):
@@ -99,8 +99,17 @@ class Mainframe( teraframe.MyFrame1 ):
             self.m_comboBox6.SetValue( option["lfcode"] )
             with open(INI,"w") as configfile:
                 conf.write(configfile)
-            with open(IP_log, "a") as iplog:
-                iplog.write( IP + "," + port+"\n" )
+            if subframe.m_checkBox3.GetValue():
+                with open(IP_log, "w") as iplog:
+                    iplog.write("")
+                with open(IP_log,"a") as iplog:
+                    subframe.IP_Dict[IP] = port
+                    connectlog = []
+                    for i in subframe.IP_Dict.keys():
+                        if i == "":
+                            continue
+                        connectlog.append("{},{}\n".format(i,subframe.IP_Dict[i]))
+                    iplog.writelines(connectlog)
             if service:
                 # socket使用の宣言
                 self.m_staticText12.SetLabel( "telnet" )
@@ -125,6 +134,7 @@ class Mainframe( teraframe.MyFrame1 ):
 
     def Telnet_receive(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.settimeout(2)
         try:
             HOST, PORT = int(option["host"]), int(option["port"])
         except:
@@ -132,6 +142,7 @@ class Mainframe( teraframe.MyFrame1 ):
         try:
             logging.info( "接続成功" )
             self.s.connect((HOST, PORT))
+            self.s.settimeout(None)
             self.org_txt = b""
             while not threadevent.wait(0.01):
                 recv_data = self.s.recv(1024)
@@ -337,13 +348,21 @@ class Mainframe( teraframe.MyFrame1 ):
         result = txtframe.Show()
 
     def Modem_line( self, event ):
-        g = self.ser
-        if self.mode == "serial":
-            dsr, cts, cd, ri = str(g.dsr), str(g.cts), str(g.cd), str(g.ri)
-            self.m_staticText35.SetLabel(
-                "DSR(6):{}, CTS(8): {}, DCD(1): {}, RI(9): {}, GND(5)".format(dsr.rjust(6," "), cts.rjust(6," "), cd.rjust(6," "), ri.rjust(6," ")))
-        else:
-            self.m_timer3.Stop()
+        try:
+            g = self.ser
+            if self.mode == "serial":
+                dsr, cts, cd, ri = str(g.dsr), str(g.cts), str(g.cd), str(g.ri)
+                self.m_staticText35.SetLabel(
+                    "DSR(6):{}, CTS(8): {}, DCD(1): {}, RI(9): {}, GND(5)".format(dsr.rjust(6," "), cts.rjust(6," "), cd.rjust(6," "), ri.rjust(6," ")))
+            else:
+                self.m_timer3.Stop()
+        except serial.serialutil.SerialException as strerror:
+            e_msg = "ERROR: " + str( strerror )
+            logging.error( e_msg )
+            box = wx.MessageDialog(None,e_msg.upper() + "\n" + HOST + "接続できませんでした","通信ソフト",wx.OK | wx.ICON_ERROR)
+            anser = box.ShowModal()
+            self.ser.close()
+            os._exit(1)
 
     def ExitHandler( self, event ):
         dlg = wx.MessageDialog( None, '通信ソフトを終了します。\nよろしいですか？',
@@ -355,9 +374,12 @@ class Mainframe( teraframe.MyFrame1 ):
             if self.mode == "selial":
                 self.ser.close()
             elif self.mode == "telnet":
-                self.s.shutdown(1)
-                sleep(1)
-                self.s.close()
+                try:
+                    self.s.shutdown(1)
+                    sleep(1)
+                    self.s.close()
+                except:
+                    pass
             self.INI_save()
             logging.info( "ソフト終了" )
             print("終了")
@@ -440,8 +462,20 @@ class MyDialog1( teraframe.MyDialog1 ):
             self.SetPosition((int(x),int(y)))
         IP_log = os.path.join( path, "IP_log.txt")
         port_array = ["COM"+str(i+1) for i in range(32)]
-        self.m_comboBox3.SetItems(port_array)
-        self.m_comboBox3.SetValue(option["serial"])
+        portlist = []
+        for i in port_array:    # 生きているポートを調べる
+            try:
+                ser = serial.Serial(i,9600)
+                portlist.append(i)
+                ser.close()
+            except:
+                pass
+
+        self.m_comboBox3.SetItems(portlist)
+        if option["serial"] in portlist:
+            self.m_comboBox3.SetValue(option["serial"])
+        else:
+            self.m_comboBox3.SetSelection(0)
         print("host:",option["host"])
 
         if os.path.exists( IP_log ):
@@ -449,7 +483,10 @@ class MyDialog1( teraframe.MyDialog1 ):
             self.IP_Dict = self.txt_list( IP_log )     # 接続ログを呼んで辞書型{IP:port}にする
             IP_list = list( self.IP_Dict.keys() )[::-1]        # 辞書のキーをリストにするのと最近の物を上にする
             self.m_comboBox1.SetItems( IP_list )    # コンボボックスに追加する
-            self.m_comboBox1.SetStringSelection(option["host"])        # 選択する
+            if option["host"] in IP_list:
+                self.m_comboBox1.SetStringSelection(option["host"])        # 選択する
+            else:
+                self.m_comboBox1.SetSelection(0)
             key = self.m_comboBox1.GetValue()
             try:
                 self.m_textCtrl1.SetValue(self.IP_Dict[key])
@@ -458,6 +495,7 @@ class MyDialog1( teraframe.MyDialog1 ):
         else:
             with open( IP_log, "w") as file:
                 file.write("")
+
 
     def IP_Set(self,event):
         key = self.m_comboBox1.GetValue()

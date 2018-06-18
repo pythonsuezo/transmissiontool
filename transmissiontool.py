@@ -10,6 +10,7 @@ from time import sleep
 from threading import Event, Thread
 import socket
 import signal
+from ctypes import windll
 
 """----------------------------------------------
 通信用ソフト
@@ -23,7 +24,7 @@ path = os.path.dirname( sys.argv[0] )
 INI = path + "/INI.conf"
 conf = configparser.SafeConfigParser()
 conf.read(INI)
-version = "Ver. 0.90"
+version = "Ver. 0.91"
 if not os.path.exists( path+"/log" ):
     os.mkdir(path+"/log")
 if not os.path.exists( INI ):
@@ -81,11 +82,28 @@ class Mainframe( teraframe.MyFrame1 ):
             if "m_pos" in conf["window"]:
                 pos = conf["window"]["m_pos"]
                 x,y = pos.split(",")
-                self.SetPosition((int(x),int(y)))
+                x,y = int(x),int(y)
+                scw, sch = windll.user32.GetSystemMetrics(0), windll.user32.GetSystemMetrics(1)
+                if x < 0:
+                    x = 0
+                if scw/2 <= x:
+                    x = 100
+                if y < 0:
+                    y = 0
+                if sch/2 <= y:
+                    y = 50
+                self.SetPosition((x,y))
             if "m_size" in conf["window"]:
                 size = conf["window"]["m_size"]
                 w,h = size.split(",")
-                self.SetSize((int(w),int(h)))
+                w,h = int(w),int(h)
+                scw, sch = windll.user32.GetSystemMetrics(0), windll.user32.GetSystemMetrics(1)
+                if scw <= x + w + 20:
+                    x = scw - w - 20
+                if sch <= y + h + 50:
+                    y = sch - h - 50
+                self.SetPosition((x,y))
+                self.SetSize((w,h))
             option["host"] = subframe.m_comboBox1.GetValue()
             option["port"] = subframe.m_textCtrl1.GetValue()
             option["serial"] = subframe.m_comboBox3.GetValue()
@@ -393,8 +411,8 @@ class Mainframe( teraframe.MyFrame1 ):
         print(self.GetScreenPosition())
         print(self.GetSize())
         x,y = self.GetScreenPosition()
-        conf["window"]["m_pos"] = str(x) + "," + str(y)
         w,h = self.GetSize()
+        conf["window"]["m_pos"] = str(x) + "," + str(y)
         conf["window"]["m_size"] = str(w) + "," + str(h)
         with open(INI,"w") as configfile:
             conf.write(configfile)
@@ -459,6 +477,17 @@ class MyDialog1( teraframe.MyDialog1 ):
         if "s_frame" in conf["window"]:
             pos = conf["window"]["s_frame"]
             x,y = pos.split(",")
+            x,y = int(x),int(y)
+            scw, sch = windll.user32.GetSystemMetrics(0), windll.user32.GetSystemMetrics(1)
+            if x < 0:
+                x = 0
+            if scw <= x + 500:
+               x = 100
+            if y < 0:
+               y = 100
+            if sch <= y + 400:
+               y = 100
+            self.SetPosition((x,y))
             self.SetPosition((int(x),int(y)))
         IP_log = os.path.join( path, "IP_log.txt")
         port_array = ["COM"+str(i+1) for i in range(32)]
